@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cek User-Agent perangkat</title>
+<style>
+  :root {
+    --ink: #1d2a33;
+    --muted: #5d6b75;
+    --paper: #eef2f4;
+    --panel: #ffffff;
+    --line: #c9d3d9;
+    --accent: #0f6e8c;
+    --ok: #2f7d4f;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: max(20px, env(safe-area-inset-top)) 16px max(28px, env(safe-area-inset-bottom));
+    background: var(--paper);
+    color: var(--ink);
+    font: 15px/1.5 -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  main { max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 22px; line-height: 1.25; margin: 0 0 4px; }
+  .lead { color: var(--muted); margin: 0 0 18px; }
+  .ua {
+    background: var(--ink);
+    color: #f3f7f9;
+    border-radius: 10px;
+    padding: 16px;
+    font: 14px/1.55 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    word-break: break-all;
+    user-select: all;
+  }
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; margin: 12px 0 22px; }
+  button {
+    appearance: none;
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: #fff;
+    font: inherit;
+    font-weight: 600;
+    padding: 10px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  button.secondary { background: transparent; color: var(--accent); }
+  button:focus-visible { outline: 3px solid #7cc4dc; outline-offset: 2px; }
+  .status { color: var(--ok); font-weight: 600; min-height: 1.5em; margin: -12px 0 16px; }
+  h2 { font-size: 16px; margin: 0 0 8px; }
+  dl {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    margin: 0;
+    padding: 4px 14px;
+  }
+  .row { display: grid; grid-template-columns: 11rem 1fr; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .row:last-child { border-bottom: 0; }
+  dt { color: var(--muted); }
+  dd { margin: 0; word-break: break-word; }
+  @media (max-width: 420px) { .row { grid-template-columns: 1fr; gap: 0; } }
+  .hint { color: var(--muted); font-size: 13px; margin-top: 18px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>User-Agent perangkat ini</h1>
+  <p class="lead">Buka halaman ini dari dalam aplikasi Instagram (misalnya lewat link di DM), lalu salin hasilnya.</p>
+
+  <div class="ua" id="ua"></div>
+  <div class="actions">
+    <button type="button" id="copyUa">Salin User-Agent</button>
+    <button type="button" class="secondary" id="copyAll">Salin semua data (JSON)</button>
+  </div>
+  <p class="status" id="status" role="status"></p>
+
+  <h2>Detail perangkat</h2>
+  <dl id="details"></dl>
+
+  <p class="hint">Halaman ini tidak mengirim data ke mana pun. Semua nilai hanya ditampilkan di layar Anda.</p>
+</main>
+
+<script>
+(async () => {
+  const nav = navigator;
+  const data = {
+    userAgent: nav.userAgent,
+    platform: nav.platform,
+    vendor: nav.vendor,
+    language: nav.language,
+    languages: (nav.languages || []).join(', '),
+    screen: `${screen.width}x${screen.height}`,
+    devicePixelRatio: window.devicePixelRatio,
+    screenPixels: `${Math.round(screen.width * devicePixelRatio)}x${Math.round(screen.height * devicePixelRatio)}`,
+    maxTouchPoints: nav.maxTouchPoints,
+    inAppBrowser: /Instagram|FBAN|FB_IAB/.test(nav.userAgent) ? 'ya' : 'tidak (buka dari Instagram)'
+  };
+
+  // Android/Chromium: client hints lengkap (model, versi platform, versi WebView penuh).
+  if (nav.userAgentData?.getHighEntropyValues) {
+    try {
+      const h = await nav.userAgentData.getHighEntropyValues(
+        ['model', 'platformVersion', 'fullVersionList', 'architecture', 'bitness']
+      );
+      data.model = h.model;
+      data.platformVersion = h.platformVersion;
+      data.architecture = [h.architecture, h.bitness].filter(Boolean).join(' / ');
+      data.brands = (h.fullVersionList || []).map((b) => `${b.brand} ${b.version}`).join(', ');
+    } catch (_) { /* tidak tersedia */ }
+  }
+
+  const labels = {
+    userAgent: 'User-Agent',
+    inAppBrowser: 'Di dalam Instagram',
+    platform: 'navigator.platform',
+    vendor: 'Vendor',
+    language: 'Bahasa utama',
+    languages: 'Semua bahasa',
+    screen: 'Layar (CSS px)',
+    devicePixelRatio: 'Device pixel ratio',
+    screenPixels: 'Layar (piksel fisik)',
+    maxTouchPoints: 'Titik sentuh maks.',
+    model: 'Model (client hints)',
+    platformVersion: 'Versi platform',
+    architecture: 'Arsitektur',
+    brands: 'Brand & versi penuh'
+  };
+
+  document.getElementById('ua').textContent = data.userAgent;
+  const dl = document.getElementById('details');
+  for (const [key, label] of Object.entries(labels)) {
+    if (key === 'userAgent' || data[key] === undefined || data[key] === '') continue;
+    const row = document.createElement('div');
+    row.className = 'row';
+    const dt = document.createElement('dt');
+    dt.textContent = label;
+    const dd = document.createElement('dd');
+    dd.textContent = String(data[key]);
+    row.append(dt, dd);
+    dl.append(row);
+  }
+
+  const status = document.getElementById('status');
+  async function copy(text, done) {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (_) {
+      // Fallback untuk WebView yang membatasi Clipboard API.
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.append(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+    }
+    status.textContent = done;
+  }
+
+  document.getElementById('copyUa').addEventListener('click', () => copy(data.userAgent, 'User-Agent disalin.'));
+  document.getElementById('copyAll').addEventListener('click', () =>
+    copy(JSON.stringify(data, null, 2), 'Semua data disalin.')
+  );
+})();
+</script>
+</body>
+</html>
